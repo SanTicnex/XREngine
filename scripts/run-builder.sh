@@ -12,7 +12,7 @@ mkdir -pv ~/.docker
 cp -v /var/lib/docker/certs/client/* ~/.docker
 touch ./builder-started.txt
 bash ./scripts/setup_helm.sh
-bash ./scripts/setup_aws.sh $AWS_ACCESS_KEY $AWS_SECRET eu-central-1 $CLUSTER_NAME
+bash ./scripts/setup_aws.sh $AWS_ACCESS_KEY $AWS_SECRET 'eu-central-1' $CLUSTER_NAME
 npm run check-db-exists
 npm run install-projects
 npm run prepare-database
@@ -27,7 +27,7 @@ bash ./scripts/cleanup_builder.sh $DOCKER_LABEL
 
 if [ $PRIVATE_ECR == "true" ]
 then
-  aws ecr get-login-password --region $AWS_REGION | docker login -u AWS --password-stdin $ECR_URL
+  aws ecr get-login-password --region 'eu-central-1' | docker login -u AWS --password-stdin $ECR_URL
 else
   aws ecr-public get-login-password --region us-east-1 | docker login -u AWS --password-stdin $ECR_URL
 fi
