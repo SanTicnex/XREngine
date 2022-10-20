@@ -40,6 +40,7 @@ import {
 } from '../../ecs/functions/ComponentFunctions'
 import { Vec3Arg } from '../../renderer/materials/constants/DefaultArgs'
 import { GroupComponent } from '../../scene/components/GroupComponent'
+import { NameComponent } from '../../scene/components/NameComponent'
 import { TransformComponent } from '../../transform/components/TransformComponent'
 import { CollisionComponent } from '../components/CollisionComponent'
 import { getTagComponentForRigidBody, RigidBodyComponent } from '../components/RigidBodyComponent'
@@ -281,7 +282,7 @@ function createRigidBodyForGroup(entity: Entity, world: World, colliderDescOptio
 
   if (!Engine.instance.isEditor)
     for (const mesh of meshesToRemove) {
-      mesh.removeFromParent()
+      // mesh.removeFromParent()
       mesh.traverse((obj: Mesh<any, any>) =>
         cleanupAllMeshData(obj, { uuid: Engine.instance.currentWorld.entityTree.entityNodeMap.get(entity)?.uuid })
       )

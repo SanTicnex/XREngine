@@ -1,15 +1,30 @@
 // TODO: this should not be here
 import { WebContainer3D } from '@etherealjs/web-layer/three/WebContainer3D'
-import { BufferGeometry, Group, Mesh, MeshBasicMaterial } from 'three'
+import {
+  AdditiveBlending,
+  BoxGeometry,
+  BufferAttribute,
+  BufferGeometry,
+  Group,
+  Mesh,
+  MeshBasicMaterial,
+  Object3D,
+  RingGeometry
+} from 'three'
 
 import { hookstate } from '@xrengine/hyperflux/functions/StateFunctions'
 
+import { proxifyVector3 } from '../common/proxies/createThreejsProxy'
+import { Entity } from '../ecs/classes/Entity'
 import { createMappedComponent, defineComponent } from '../ecs/functions/ComponentFunctions'
+import { addObjectToGroup } from '../scene/components/GroupComponent'
 import { QuaternionSchema, Vector3Schema } from '../transform/components/TransformComponent'
 
 export type XRGripButtonComponentType = {}
 
+/** @deprecated */
 export const XRLGripButtonComponent = createMappedComponent<XRGripButtonComponentType>('XRLGripButtonComponent')
+/** @deprecated */
 export const XRRGripButtonComponent = createMappedComponent<XRGripButtonComponentType>('XRRGripButtonComponent')
 
 export type XRHandsInputComponentType = {
@@ -57,77 +72,10 @@ const XRHandsInputSchema = {
   left: HandSchema,
   right: HandSchema
 }
-
+/** @deprecated */
 export const XRHandsInputComponent = createMappedComponent<XRHandsInputComponentType, typeof XRHandsInputSchema>(
   'XRHandsInputComponent',
   XRHandsInputSchema
-)
-
-export type ControllerGroup = Group & {
-  targetRay: Mesh<BufferGeometry, MeshBasicMaterial>
-  cursor: Mesh<BufferGeometry, MeshBasicMaterial>
-  lastHit: ReturnType<typeof WebContainer3D.prototype.hitTest> | null
-}
-
-export type XRInputSourceComponentType = {
-  // Flatten the controller hirearchy
-  // to be able to send the data over network
-  // (do not use directly)
-  controllerLeftParent: Group
-  controllerRightParent: Group
-  controllerGripLeftParent: Group
-  controllerGripRightParent: Group
-
-  /**
-   * @property {ControllerGroup} controllerLeft
-   * @property {ControllerGroup} controllerRight
-   * the controllers
-   */
-  controllerLeft: ControllerGroup
-  controllerRight: ControllerGroup
-
-  /**
-   * @property {Group} controllerGripLeft
-   * @property {Group} controllerGripRight
-   * controller grips hold the information for grips, which are where the user grabs things from
-   */
-  controllerGripLeft: Group
-  controllerGripRight: Group
-
-  /**
-   * @property {Group} controllerGroup is the group that holds all the controller groups,
-   * so they can be transformed together
-   */
-  container: Group
-
-  /**
-   * @property {Group} head
-   */
-  head: Group
-}
-
-const GroupSchema = {
-  position: Vector3Schema,
-  quaternion: QuaternionSchema
-}
-
-const XRInputSourceSchema = {
-  controllerLeftParent: GroupSchema,
-  controllerRightParent: GroupSchema,
-  controllerGripLeftParent: GroupSchema,
-  controllerGripRightParent: GroupSchema,
-
-  controllerLeft: GroupSchema,
-  controllerRight: GroupSchema,
-  controllerGripLeft: GroupSchema,
-  controllerGripRight: GroupSchema,
-  container: GroupSchema,
-  head: GroupSchema
-}
-
-export const XRInputSourceComponent = createMappedComponent<XRInputSourceComponentType, typeof XRInputSourceSchema>(
-  'XRInputSourceComponent',
-  XRInputSourceSchema
 )
 
 export const XRHitTestComponent = defineComponent({
@@ -171,6 +119,126 @@ export const XRAnchorComponent = defineComponent({
   toJSON: () => {
     return null! as {
       anchor: XRAnchor
+    }
+  }
+})
+
+export const InputSourceComponent = defineComponent({
+  name: 'XRControllerComponent',
+  onAdd: (entity) => {
+    return {
+      inputSource: null! as XRInputSource
+    }
+  },
+
+  onUpdate: (entity, component, json) => {
+    if (json.inputSource) component.inputSource = json.inputSource as XRInputSource
+  },
+
+  toJSON: () => {
+    return null! as {
+      inputSource: XRInputSource
+    }
+  }
+})
+
+export const XRControllerComponent = defineComponent({
+  name: 'XRControllerComponent',
+  onAdd: (entity) => {
+    return {
+      targetRaySpace: null! as XRSpace,
+      handedness: null! as XRHandedness,
+      grip: null as Entity | null,
+      hand: null as Entity | null
+    }
+  },
+
+  onUpdate: (entity, component, json) => {
+    if (json.targetRaySpace) component.targetRaySpace = json.targetRaySpace as XRSpace
+    if (json.handedness) component.handedness = json.handedness as XRHandedness
+  },
+
+  toJSON: () => {
+    return null! as {
+      targetRaySpace: XRSpace
+      handedness: XRHandedness
+      grip: Entity | null
+      hand: Entity | null
+    }
+  }
+})
+
+export type PointerObject = Object3D & {
+  targetRay?: Mesh<BufferGeometry, MeshBasicMaterial>
+  cursor?: Mesh<BufferGeometry, MeshBasicMaterial>
+  lastHit?: ReturnType<typeof WebContainer3D.prototype.hitTest> | null
+}
+
+export const XRPointerComponent = defineComponent({
+  name: 'XRPointer',
+
+  onAdd: (entity) => {
+    return {
+      pointer: null! as PointerObject
+    }
+  },
+
+  onUpdate: (entity, component, json) => {
+    if (json.pointer) component.pointer = json.pointer as PointerObject
+  },
+
+  toJSON: () => {
+    return null! as {
+      pointer: PointerObject
+    }
+  }
+})
+
+export const XRControllerGripComponent = defineComponent({
+  name: 'XRControllerGrip',
+  onAdd: (entity) => {
+    return {
+      gripSpace: null! as XRSpace,
+      handedness: null! as XRHandedness
+    }
+  },
+
+  onUpdate: (entity, component, json) => {
+    if (json.gripSpace) component.gripSpace = json.gripSpace as XRSpace
+    if (json.handedness) component.handedness = json.handedness as XRHandedness
+  },
+
+  toJSON: () => {
+    return null! as {
+      gripSpace: XRSpace
+      handedness: XRHandedness
+    }
+  }
+})
+
+export const XRHandComponent = defineComponent({
+  name: 'XRHand',
+  onAdd: (entity) => {
+    const group = new Group()
+    addObjectToGroup(entity, group)
+    return {
+      hand: null! as XRHand,
+      group,
+      handedness: null! as XRHandedness,
+      joints: {} as { [name: string]: Group & { jointRadius: number | undefined } },
+      pinching: false
+    }
+  },
+
+  onUpdate: (entity, component, json) => {
+    if (json.hand) component.hand = json.hand as XRHand
+    if (json.handedness) component.handedness = json.handedness as XRHandedness
+  },
+
+  toJSON: () => {
+    return null! as {
+      hand: XRHand
+      handedness: XRHandedness
     }
   }
 })

@@ -13,15 +13,17 @@ import {
   ToneMappingEffect
 } from 'postprocessing'
 import {
+  Light,
   PerspectiveCamera,
+  ShadowMapType,
   sRGBEncoding,
+  ToneMapping,
   WebGL1Renderer,
   WebGLRenderer,
   WebGLRendererParameters,
   WebXRManager
 } from 'three'
 
-import { isDev } from '@xrengine/common/src/utils/isDev'
 import { createActionQueue, dispatchAction, getState, removeActionQueue } from '@xrengine/hyperflux'
 
 import { CSM } from '../assets/csm/CSM'
@@ -33,16 +35,11 @@ import { Engine } from '../ecs/classes/Engine'
 import { EngineActions, getEngineState } from '../ecs/classes/EngineState'
 import { Entity } from '../ecs/classes/Entity'
 import { World } from '../ecs/classes/World'
-import { matchActionOnce } from '../networking/functions/matchActionOnce'
 import { XRState } from '../xr/XRState'
 import { LinearTosRGBEffect } from './effects/LinearTosRGBEffect'
-import {
-  accessEngineRendererState,
-  EngineRendererAction,
-  EngineRendererReceptor,
-  restoreEngineRendererData
-} from './EngineRendererState'
+import { accessEngineRendererState, EngineRendererAction, EngineRendererReceptor } from './EngineRendererState'
 import { configureEffectComposer } from './functions/configureEffectComposer'
+import { updateShadowMap } from './functions/RenderSettingsFunction'
 import WebGL from './THREE.WebGL'
 
 export interface EffectComposerWithSchema extends EffectComposer {
@@ -93,12 +90,11 @@ export class EngineRenderer {
 
   renderer: WebGLRenderer = null!
   effectComposer: EffectComposerWithSchema = null!
+  /** @todo deprecate and replace with engine implementation */
   xrManager: WebXRManager = null!
+  /** @deprecated use Engine.instance.xrFrame.session instead */
   xrSession: XRSession = null!
   csm: CSM = null!
-  isCSMEnabled = false
-  directionalLightEntities: Entity[] = []
-  activeCSMLightEntity: Entity | null = null
   webGLLostContext: any = null
 
   initialize() {
@@ -199,11 +195,6 @@ export class EngineRenderer {
     this.needsResize = true
   }
 
-  resetScene() {
-    this.directionalLightEntities = []
-    this.activeCSMLightEntity = null!
-  }
-
   /** Called on resize, sets resize flag. */
   onResize(): void {
     this.needsResize = true
@@ -216,11 +207,8 @@ export class EngineRenderer {
   execute(delta: number): void {
     const activeSession = getState(XRState).sessionActive.value
 
-    /** Disable rendering on HMDs when not in a session to improve experience */
-    if (isHMD && !activeSession) return
-
     /** Postprocessing does not support multipass yet, so just use basic renderer when in VR */
-    if (isHMD && activeSession) {
+    if ((isHMD && activeSession) || EngineRenderer.instance.xrSession) {
       this.renderer.render(Engine.instance.currentWorld.scene, Engine.instance.currentWorld.camera)
     } else {
       const state = accessEngineRendererState()
@@ -289,8 +277,6 @@ export class EngineRenderer {
 }
 
 export default async function WebGLRendererSystem(world: World) {
-  restoreEngineRendererData()
-
   const setQualityLevelActions = createActionQueue(EngineRendererAction.setQualityLevel.matches)
   const setAutomaticActions = createActionQueue(EngineRendererAction.setAutomatic.matches)
   const setPostProcessingActions = createActionQueue(EngineRendererAction.setPostProcessing.matches)
@@ -300,7 +286,30 @@ export default async function WebGLRendererSystem(world: World) {
   const changeNodeHelperVisibilityActions = createActionQueue(EngineRendererAction.changeNodeHelperVisibility.matches)
   const changeGridToolHeightActions = createActionQueue(EngineRendererAction.changeGridToolHeight.matches)
   const changeGridToolVisibilityActions = createActionQueue(EngineRendererAction.changeGridToolVisibility.matches)
-  const restoreStorageDataActions = createActionQueue(EngineRendererAction.restoreStorageData.matches)
+
+  const updateToneMapping = () => {
+    EngineRenderer.instance.renderer.toneMapping = world.sceneMetadata.renderSettings.toneMapping.value
+  }
+  const updateToneMappingExposure = () => {
+    EngineRenderer.instance.renderer.toneMappingExposure = world.sceneMetadata.renderSettings.toneMappingExposure.value
+  }
+  const updatePostprocessing = () => {
+    configureEffectComposer()
+  }
+  const _updateShadowMap = () => {
+    updateShadowMap()
+  }
+
+  world.sceneMetadata.renderSettings.toneMapping.subscribe(updateToneMapping)
+  world.sceneMetadata.renderSettings.toneMappingExposure.subscribe(updateToneMappingExposure)
+  world.sceneMetadata.renderSettings.shadowMapType.subscribe(_updateShadowMap)
+  world.sceneMetadata.postprocessing.subscribe(updatePostprocessing)
+
+  // remove the following once subscribers detect merged state https://github.com/avkonst/hookstate/issues/338
+  updateToneMapping()
+  updateToneMappingExposure()
+  _updateShadowMap()
+  updatePostprocessing()
 
   const execute = () => {
     for (const action of setQualityLevelActions()) EngineRendererReceptor.setQualityLevel(action)
@@ -312,7 +321,6 @@ export default async function WebGLRendererSystem(world: World) {
     for (const action of changeNodeHelperVisibilityActions()) EngineRendererReceptor.changeNodeHelperVisibility(action)
     for (const action of changeGridToolHeightActions()) EngineRendererReceptor.changeGridToolHeight(action)
     for (const action of changeGridToolVisibilityActions()) EngineRendererReceptor.changeGridToolVisibility(action)
-    for (const action of restoreStorageDataActions()) EngineRendererReceptor.restoreStorageData(action)
 
     EngineRenderer.instance.execute(world.deltaSeconds)
   }
@@ -327,7 +335,6 @@ export default async function WebGLRendererSystem(world: World) {
     removeActionQueue(changeNodeHelperVisibilityActions)
     removeActionQueue(changeGridToolHeightActions)
     removeActionQueue(changeGridToolVisibilityActions)
-    removeActionQueue(restoreStorageDataActions)
   }
 
   return { execute, cleanup }

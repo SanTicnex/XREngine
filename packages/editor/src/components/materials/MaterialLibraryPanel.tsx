@@ -6,6 +6,7 @@ import { MeshBasicMaterial } from 'three'
 
 import exportMaterialsGLTF from '@xrengine/engine/src/assets/functions/exportMaterialsGLTF'
 import { Engine } from '@xrengine/engine/src/ecs/classes/Engine'
+import { SourceType } from '@xrengine/engine/src/renderer/materials/components/MaterialSource'
 import { LibraryEntryType } from '@xrengine/engine/src/renderer/materials/constants/LibraryEntry'
 import {
   entryId,
@@ -34,9 +35,12 @@ export default function MaterialLibraryPanel() {
   const selectionState = useSelectionState()
   const MemoMatLibEntry = memo(MaterialLibraryEntry, areEqual)
   const nodeChanges = useHookstate(0)
-  const collapsedNodes = useHookstate(new Set<string>())
+  const srcs = [...MaterialLibrary.sources.values()]
+  const collapsedNodes = useHookstate(
+    new Set<string>(srcs.map((src) => entryId(src, LibraryEntryType.MATERIAL_SOURCE)))
+  )
   const createNodes = useCallback((): MaterialLibraryEntryType[] => {
-    const result = [...MaterialLibrary.sources.values()].flatMap((srcComp) => {
+    const result = srcs.flatMap((srcComp) => {
       const uuid = entryId(srcComp, LibraryEntryType.MATERIAL_SOURCE)
       const isCollapsed = collapsedNodes.value.has(uuid)
       return [
@@ -130,7 +134,7 @@ export default function MaterialLibraryPanel() {
           <Stack direction={'column'} spacing={2}>
             <Button
               onClick={() => {
-                registerMaterial(new MeshBasicMaterial(), { path: '', type: 'Editor Session' })
+                registerMaterial(new MeshBasicMaterial(), { path: '', type: SourceType.EDITOR_SESSION })
                 nodeChanges.set(nodeChanges.get() + 1)
               }}
             >

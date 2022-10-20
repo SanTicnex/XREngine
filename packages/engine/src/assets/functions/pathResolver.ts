@@ -3,8 +3,10 @@ import { filter } from 'lodash'
 import { Engine } from '../../ecs/classes/Engine'
 
 export function pathResolver() {
-  const hostPath = Engine.instance.publicPath.replace(/:\d{4}$/, '')
-  const cacheRe = new RegExp(`${hostPath}:\\d{4}\/projects\/[^\/]+\/`)
+  //const hostPath = Engine.instance.publicPath.replace(/:\d{4}$/, '')
+  //const cacheRe = new RegExp(`([^\\\/]+\/projects)\/([^\/]+)\/(.*$)`)
+  const cacheRe = new RegExp(`(https://[^\\\/]+)\/projects\/([^\/]+)\/(.*$)`)
+  //                          1: project path -- 2: project name -- 3: internal path
   return cacheRe
 }
 
@@ -13,13 +15,7 @@ export function getFileName(path: string) {
 }
 
 export function getProjectName(path: string) {
-  return (
-    pathResolver()
-      .exec(path)?.[0]
-      .split(/[\\\/]+/)
-      .filter((x) => !!x)
-      .at(-1)! ?? ''
-  )
+  return pathResolver().exec(path)?.[2] ?? ''
 }
 
 export function modelResourcesPath(modelName: string) {
