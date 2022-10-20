@@ -29,7 +29,7 @@ import { createActionQueue, getState, removeActionQueue } from '@xrengine/hyperf
 
 import { AssetLoader } from '../../assets/classes/AssetLoader'
 import { PositionalAudioComponent } from '../../audio/components/PositionalAudioComponent'
-import { AvatarAnimationComponent } from '../../avatar/components/AvatarAnimationComponent'
+import { AvatarAnimationComponent, AvatarRigComponent } from '../../avatar/components/AvatarAnimationComponent'
 import { AvatarPendingComponent } from '../../avatar/components/AvatarPendingComponent'
 import { Engine } from '../../ecs/classes/Engine'
 import { Entity } from '../../ecs/classes/Entity'
@@ -45,12 +45,6 @@ import InfiniteGridHelper from '../../scene/classes/InfiniteGridHelper'
 import Spline from '../../scene/classes/Spline'
 import { DirectionalLightComponent } from '../../scene/components/DirectionalLightComponent'
 import { EnvMapBakeComponent } from '../../scene/components/EnvMapBakeComponent'
-import {
-  addObjectToGroup,
-  GroupComponent,
-  removeGroupComponent,
-  removeObjectFromGroup
-} from '../../scene/components/GroupComponent'
 import { AudioNodeGroups, MediaElementComponent } from '../../scene/components/MediaComponent'
 import { MountPointComponent } from '../../scene/components/MountPointComponent'
 import { PointLightComponent } from '../../scene/components/PointLightComponent'
@@ -63,8 +57,6 @@ import { SpotLightComponent } from '../../scene/components/SpotLightComponent'
 import { ObjectLayers } from '../../scene/constants/ObjectLayers'
 import { setObjectLayers } from '../../scene/functions/setObjectLayers'
 import { TransformComponent } from '../../transform/components/TransformComponent'
-import { XRHitTestComponent, XRInputSourceComponent } from '../../xr/XRComponents'
-import { XRState } from '../../xr/XRState'
 import { DebugNavMeshComponent } from '../DebugNavMeshComponent'
 import { PositionalAudioHelper } from '../PositionalAudioHelper'
 
@@ -115,8 +107,7 @@ export default async function DebugHelpersSystem(world: World) {
   ])
 
   const boundingBoxQuery = defineQuery([TransformComponent, BoundingBoxComponent])
-  const ikAvatarQuery = defineQuery([XRInputSourceComponent])
-  const avatarAnimationQuery = defineQuery([AvatarAnimationComponent])
+  const avatarAnimationQuery = defineQuery([AvatarRigComponent])
   const navmeshQuery = defineQuery([DebugNavMeshComponent, NavMeshComponent])
   const audioHelper = defineQuery([PositionalAudioComponent, MediaElementComponent])
   // const navpathQuery = defineQuery([AutoPilotComponent])
@@ -421,7 +412,7 @@ export default async function DebugHelpersSystem(world: World) {
      * AVATAR HELPERS
      */
     for (const entity of avatarAnimationQuery()) {
-      const anim = getComponent(entity, AvatarAnimationComponent)
+      const anim = getComponent(entity, AvatarRigComponent)
       if (
         !helpersByEntity.skeletonHelpers.has(entity) &&
         debugEnabled &&
@@ -447,48 +438,6 @@ export default async function DebugHelpersSystem(world: World) {
       if (helper) {
         Engine.instance.currentWorld.scene.remove(helper)
         helpersByEntity.skeletonHelpers.delete(entity)
-      }
-    }
-
-    for (const entity of ikAvatarQuery()) {
-      if (debugEnabled) {
-        if (!helpersByEntity.ikExtents.has(entity)) {
-          const debugHead = new Mesh(cubeGeometry, new MeshBasicMaterial({ color: new Color('red'), side: DoubleSide }))
-          if (entity === world.localClientEntity) debugHead.material.visible = false
-          const debugLeft = new Mesh(cubeGeometry, new MeshBasicMaterial({ color: new Color('yellow') }))
-          const debugRight = new Mesh(cubeGeometry, new MeshBasicMaterial({ color: new Color('blue') }))
-          debugHead.visible = debugEnabled
-          debugLeft.visible = debugEnabled
-          debugRight.visible = debugEnabled
-          Engine.instance.currentWorld.scene.add(debugHead)
-          Engine.instance.currentWorld.scene.add(debugLeft)
-          Engine.instance.currentWorld.scene.add(debugRight)
-          helpersByEntity.ikExtents.set(entity, [debugHead, debugLeft, debugRight])
-        }
-        const xrInputSourceComponent = getComponent(entity, XRInputSourceComponent)
-        const [debugHead, debugLeft, debugRight] = helpersByEntity.ikExtents.get(entity) as Object3D[]
-        debugHead.position.copy(xrInputSourceComponent.head.getWorldPosition(vector3))
-        debugHead.quaternion.copy(xrInputSourceComponent.head.getWorldQuaternion(quat))
-        debugLeft.position.copy(xrInputSourceComponent.controllerLeft.getWorldPosition(vector3))
-        debugLeft.quaternion.copy(xrInputSourceComponent.controllerLeft.getWorldQuaternion(quat))
-        debugRight.position.copy(xrInputSourceComponent.controllerRight.getWorldPosition(vector3))
-        debugRight.quaternion.copy(xrInputSourceComponent.controllerRight.getWorldQuaternion(quat))
-      } else {
-        if (helpersByEntity.ikExtents.has(entity)) {
-          ;(helpersByEntity.ikExtents.get(entity) as Object3D[]).forEach((obj: Object3D) => {
-            obj.removeFromParent()
-          })
-          helpersByEntity.ikExtents.delete(entity)
-        }
-      }
-    }
-
-    for (const entity of ikAvatarQuery.exit()) {
-      if (helpersByEntity.ikExtents.has(entity)) {
-        ;(helpersByEntity.ikExtents.get(entity) as Object3D[]).forEach((obj: Object3D) => {
-          obj.removeFromParent()
-        })
-        helpersByEntity.ikExtents.delete(entity)
       }
     }
 
@@ -586,7 +535,6 @@ export default async function DebugHelpersSystem(world: World) {
     removeQuery(world, directionalLightSelectQuery)
     removeQuery(world, scenePreviewCameraSelectQuery)
     removeQuery(world, boundingBoxQuery)
-    removeQuery(world, ikAvatarQuery)
     removeQuery(world, avatarAnimationQuery)
     removeQuery(world, navmeshQuery)
     removeQuery(world, audioHelper)

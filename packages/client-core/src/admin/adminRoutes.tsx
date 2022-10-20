@@ -1,9 +1,9 @@
 import React, { Suspense, useEffect } from 'react'
 import { Redirect, Switch } from 'react-router-dom'
 
-import { Engine } from '@xrengine/engine/src/ecs/classes/Engine'
 import { useEngineState } from '@xrengine/engine/src/ecs/classes/EngineState'
-import { initializeCoreSystems, initializeSceneSystems } from '@xrengine/engine/src/initializeEngine'
+import { initializeCoreSystems } from '@xrengine/engine/src/initializeCoreSystems'
+import { initializeSceneSystems } from '@xrengine/engine/src/initializeSceneSystems'
 
 import CircularProgress from '@mui/material/CircularProgress'
 
@@ -95,7 +95,6 @@ const ProtectedRoutes = () => {
         {!isEngineInitialized && <LoadingView sx={{ height: '100vh' }} />}
         {isEngineInitialized && (
           <Switch>
-            <PrivateRoute exact path="/admin" component={analytic} />
             {allowedRoutes.globalAvatars && <PrivateRoute exact path="/admin/avatars" component={avatars} />}
             {allowedRoutes.benchmarking && <PrivateRoute exact path="/admin/benchmarking" component={benchmarking} />}
             {allowedRoutes.groups && <PrivateRoute exact path="/admin/groups" component={groups} />}
@@ -108,7 +107,9 @@ const ProtectedRoutes = () => {
             {allowedRoutes.projects && <PrivateRoute exact path="/admin/projects" component={projects} />}
             {allowedRoutes.settings && <PrivateRoute exact path="/admin/settings" component={setting} />}
             {allowedRoutes.static_resource && <PrivateRoute exact path="/admin/resources" component={resources} />}
-            {allowedRoutes.user && <PrivateRoute exact Path="/admin/users" component={users} />}
+            {allowedRoutes.user && <PrivateRoute exact path="/admin/users" component={users} />}
+            <PrivateRoute exact path="/admin/*" component={() => <Redirect to="/admin" />} />
+            <PrivateRoute path="/admin" component={analytic} />
           </Switch>
         )}
       </Suspense>

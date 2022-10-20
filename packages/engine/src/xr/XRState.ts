@@ -6,6 +6,7 @@ import { defineAction } from '@xrengine/hyperflux'
 import { Entity } from '../ecs/classes/Entity'
 import { NetworkTopics } from '../networking/classes/Network'
 import { DepthDataTexture } from './DepthDataTexture'
+import { XREstimatedLight } from './XREstimatedLight'
 
 export const XRState = defineState({
   name: 'XRState',
@@ -26,13 +27,21 @@ export const XRState = defineState({
      * When `avatarControlMode` is 'auto', the avatar will switch between these modes automtically based on the current XR session mode and other heursitics.
      */
     avatarControlMode: 'auto' as 'auto' | 'attached' | 'detached',
+    avatarHeadLock: 'auto' as 'auto' | true | false,
+    /** origin is always 0,0,0 */
     originReferenceSpace: null as XRReferenceSpace | null,
     viewerReferenceSpace: null as XRReferenceSpace | null,
     viewerHitTestSource: null as XRHitTestSource | null,
     viewerHitTestEntity: NaN as Entity,
     sceneRotationOffset: 0,
     /** Stores the depth map data - will exist if depth map is supported */
-    depthDataTexture: null as DepthDataTexture | null
+    depthDataTexture: null as DepthDataTexture | null,
+    is8thWallActive: false,
+    isEstimatingLight: false,
+    lightEstimator: null! as XREstimatedLight,
+    viewerInputSourceEntity: null as Entity | null,
+    leftControllerEntity: null as Entity | null,
+    rightControllerEntity: null as Entity | null
   })
 })
 
@@ -55,13 +64,20 @@ export class XRAction {
   static sessionChanged = defineAction({
     type: 'xre.xr.sessionChanged' as const,
     active: matches.boolean,
-    $cache: { removePrevious: true },
-    $topic: NetworkTopics.world
+    $cache: { removePrevious: true }
   })
 
   static changePlacementMode = defineAction({
     type: 'xre.xr.changePlacementMode',
     active: matches.boolean
+  })
+
+  // todo, support more haptic formats other than just vibrating controllers
+  static vibrateController = defineAction({
+    type: 'xre.xr.vibrateController',
+    handedness: matches.literals('left', 'right'),
+    value: matches.number,
+    duration: matches.number
   })
 }
 
@@ -72,4 +88,9 @@ export const getControlMode = () => {
     return sessionMode === 'immersive-vr' || sessionMode === 'inline' ? 'attached' : 'detached'
   }
   return avatarControlMode
+}
+
+export const getAvatarHeadLock = () => {
+  const { avatarHeadLock } = getState(XRState)
+  return avatarHeadLock.value === 'auto' ? true : avatarHeadLock.value
 }
